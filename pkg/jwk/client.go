@@ -2,6 +2,7 @@ package jwk
 
 import (
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,6 +24,9 @@ type (
 	ClientConfig struct {
 		DisableStrictTLS bool
 		EnableDebug      bool
+		AppendCACert     bool
+		CACertPath       string
+		ServerHostName   string
 		logger           *log.Logger
 		CacheTimeout     time.Duration
 		RequestTimeout   time.Duration
@@ -54,9 +58,24 @@ var (
 )
 
 // NewClient returns a new JWKS client.
-func NewClient(jwksEndpoint string, options ...Option) *Client {
+func NewClient(jwksEndpoint string, options ...Option) (*Client, error) {
 	config := DefaultClientConfig
 	setOption(&config, options...)
+
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: config.DisableStrictTLS,
+	}
+	if config.CACertPath != "" {
+		CAs, err := loadCACert(config.AppendCACert, config.CACertPath)
+		if err != nil {
+			config.logger.Printf("Error from NewClient: %s", err)
+			return nil, err
+		}
+		tlsConfig.RootCAs = CAs
+	}
+	if config.ServerHostName != "" {
+		tlsConfig.ServerName = config.ServerHostName
+	}
 
 	client := &Client{
 		config:      &config,
@@ -65,13 +84,11 @@ func NewClient(jwksEndpoint string, options ...Option) *Client {
 		doneChan:    make(chan struct{}),
 		dog:         createWatchdog(config.CacheTimeout),
 		httpClient: &http.Client{
-			Timeout: config.RequestTimeout,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: config.DisableStrictTLS},
-			},
+			Timeout:   config.RequestTimeout,
+			Transport: &http.Transport{TLSClientConfig: tlsConfig},
 		},
 	}
-	return client
+	return client, nil
 }
 
 // Start to fetch and cache JWKS.
@@ -190,4 +207,24 @@ func closeBody(resp *http.Response) {
 		io.Copy(ioutil.Discard, resp.Body)
 		resp.Body.Close()
 	}
+}
+
+func loadCACert(appendCACert bool, CACertPath string) (*x509.CertPool, error) {
+	CAs := x509.NewCertPool()
+	if appendCACert {
+		if rootCAs, _ := x509.SystemCertPool(); rootCAs != nil {
+			CAs = rootCAs
+		}
+	}
+
+	certs, err := ioutil.ReadFile(CACertPath)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read CA Cert from %s: %v", CACertPath, err)
+	}
+
+	if ok := CAs.AppendCertsFromPEM(certs); !ok {
+		return nil, fmt.Errorf("Failed to append CA Cert")
+	}
+
+	return CAs, nil
 }

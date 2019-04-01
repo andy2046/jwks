@@ -36,7 +36,7 @@ func (t *mockSuccessTransport) RoundTrip(req *http.Request) (*http.Response, err
 func TestSuccessHttpRequest(t *testing.T) {
 	httpClient := http.DefaultClient
 	httpClient.Transport = &mockSuccessTransport{}
-	jwkClient := NewClient("http://andy2046.io")
+	jwkClient, _ := NewClient("http://andy2046.io")
 	jwkClient.httpClient = httpClient
 	jwkClient.config.EnableDebug = true
 
