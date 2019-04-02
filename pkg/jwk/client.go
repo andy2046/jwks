@@ -1,6 +1,7 @@
 package jwk
 
 import (
+	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -40,8 +41,10 @@ type (
 		keySet      *JSONWebKeySet
 		mutex       sync.RWMutex
 		doneChan    chan struct{}
+		refreshChan chan struct{}
 		dog         *watchdog
 		closed      bool
+		started     bool
 	}
 
 	// Option applies config to Client Config.
@@ -51,7 +54,6 @@ type (
 var (
 	// DefaultClientConfig is the default Client Config.
 	DefaultClientConfig = ClientConfig{
-		logger:         log.New(os.Stdout, "jwks:", log.LstdFlags|log.Lshortfile),
 		CacheTimeout:   defaultCacheTimeout,
 		RequestTimeout: defaultRequestTimeout,
 	}
@@ -61,6 +63,9 @@ var (
 func NewClient(jwksEndpoint string, options ...Option) (*Client, error) {
 	config := DefaultClientConfig
 	setOption(&config, options...)
+	if config.logger == nil {
+		config.logger = log.New(os.Stdout, "jwks:", log.LstdFlags|log.Lshortfile)
+	}
 
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: config.DisableStrictTLS,
@@ -82,6 +87,7 @@ func NewClient(jwksEndpoint string, options ...Option) (*Client, error) {
 		endpointURL: jwksEndpoint,
 		keySet:      &JSONWebKeySet{},
 		doneChan:    make(chan struct{}),
+		refreshChan: make(chan struct{}),
 		dog:         createWatchdog(config.CacheTimeout),
 		httpClient: &http.Client{
 			Timeout:   config.RequestTimeout,
@@ -93,6 +99,15 @@ func NewClient(jwksEndpoint string, options ...Option) (*Client, error) {
 
 // Start to fetch and cache JWKS.
 func (client *Client) Start() error {
+	started := client.isStarted()
+	if started {
+		client.config.logger.Println("Warning from Start: Client already started")
+		return fmt.Errorf("Client already started")
+	}
+	client.mutex.Lock()
+	client.started = true
+	client.mutex.Unlock()
+
 	if err := client.fetchJWKS(); err != nil {
 		return err
 	}
@@ -124,6 +139,7 @@ func (client *Client) watch() {
 					client.config.logger.Println("exit watch")
 				}
 				client.dog.stop()
+				close(client.refreshChan)
 				return
 			}
 			if client.config.EnableDebug {
@@ -131,21 +147,30 @@ func (client *Client) watch() {
 			}
 			fetch()
 			client.dog.resetTicker()
+			client.refreshChan <- struct{}{}
 		}
 	}
 }
 
 // ForceRefresh refresh cache while called.
+// the call is ignored if client is stopped or not started yet.
 func (client *Client) ForceRefresh() {
+	started := client.isStarted()
+	if !started {
+		client.config.logger.Println("Warning from ForceRefresh: Client not started")
+		return
+	}
+
 	closed := client.isClosed()
 	if closed {
-		client.config.logger.Println("Warning from ForceRefresh: Client closed")
+		client.config.logger.Println("Warning from ForceRefresh: Client stopped")
 		return
 	}
 	client.doneChan <- struct{}{}
+	<-client.refreshChan
 }
 
-// Stop updating cache periodically.
+// Stop to update cache periodically.
 func (client *Client) Stop() {
 	client.mutex.Lock()
 	defer client.mutex.Unlock()
@@ -166,10 +191,22 @@ func (client *Client) KeySet() *JSONWebKeySet {
 	return client.keySet
 }
 
+// PreLoad `kid` and `rsa.PublicKey` pair into client.
+func (client *Client) PreLoad(kid string, key *rsa.PublicKey) {
+	jwkey := JSONWebKey{Key: key, KeyID: kid, Algorithm: "RS256", Use: "sig"}
+	client.keySet.Keys = append(client.keySet.Keys, jwkey)
+}
+
 func (client *Client) isClosed() bool {
 	client.mutex.RLock()
 	defer client.mutex.RUnlock()
 	return client.closed
+}
+
+func (client *Client) isStarted() bool {
+	client.mutex.RLock()
+	defer client.mutex.RUnlock()
+	return client.started
 }
 
 func (client *Client) fetchJWKS() (err error) {
@@ -188,7 +225,10 @@ func (client *Client) fetchJWKS() (err error) {
 	}
 	defer closeBody(resp)
 
-	err = json.NewDecoder(resp.Body).Decode(client.keySet)
+	keySet := &JSONWebKeySet{}
+	if err = json.NewDecoder(resp.Body).Decode(keySet); err == nil {
+		client.keySet = keySet
+	}
 	return
 }
 

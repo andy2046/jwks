@@ -16,6 +16,7 @@
   * [func NewClient(jwksEndpoint string, options ...Option) (*Client, error)](#NewClient)
   * [func (client *Client) ForceRefresh()](#Client.ForceRefresh)
   * [func (client *Client) KeySet() *JSONWebKeySet](#Client.KeySet)
+  * [func (client *Client) PreLoad(kid string, key *rsa.PublicKey)](#Client.PreLoad)
   * [func (client *Client) Start() error](#Client.Start)
   * [func (client *Client) Stop()](#Client.Stop)
 * [type ClientConfig](#ClientConfig)
@@ -39,7 +40,6 @@
 var (
     // DefaultClientConfig is the default Client Config.
     DefaultClientConfig = ClientConfig{
-        logger:         log.New(os.Stdout, "jwks:", log.LstdFlags|log.Lshortfile),
         CacheTimeout:   defaultCacheTimeout,
         RequestTimeout: defaultRequestTimeout,
     }
@@ -48,7 +48,7 @@ var (
 
 
 
-## <a name="Client">type</a> [Client](/src/target/client.go?s=589:810#L36)
+## <a name="Client">type</a> [Client](/src/target/client.go?s=603:871#L37)
 ``` go
 type Client struct {
     // contains filtered or unexported fields
@@ -62,7 +62,7 @@ Client fetch keys from a JSON Web Key set endpoint.
 
 
 
-### <a name="NewClient">func</a> [NewClient](/src/target/client.go?s=1195:1266#L61)
+### <a name="NewClient">func</a> [NewClient](/src/target/client.go?s=1179:1250#L63)
 ``` go
 func NewClient(jwksEndpoint string, options ...Option) (*Client, error)
 ```
@@ -72,16 +72,17 @@ NewClient returns a new JWKS client.
 
 
 
-### <a name="Client.ForceRefresh">func</a> (\*Client) [ForceRefresh](/src/target/client.go?s=2995:3031#L139)
+### <a name="Client.ForceRefresh">func</a> (\*Client) [ForceRefresh](/src/target/client.go?s=3490:3526#L157)
 ``` go
 func (client *Client) ForceRefresh()
 ```
 ForceRefresh refresh cache while called.
+the call is ignored if client is stopped or not started yet.
 
 
 
 
-### <a name="Client.KeySet">func</a> (\*Client) [KeySet](/src/target/client.go?s=3508:3553#L162)
+### <a name="Client.KeySet">func</a> (\*Client) [KeySet](/src/target/client.go?s=4166:4211#L187)
 ``` go
 func (client *Client) KeySet() *JSONWebKeySet
 ```
@@ -90,7 +91,16 @@ KeySet returns the cached JSONWebKeySet.
 
 
 
-### <a name="Client.Start">func</a> (\*Client) [Start](/src/target/client.go?s=2100:2135#L95)
+### <a name="Client.PreLoad">func</a> (\*Client) [PreLoad](/src/target/client.go?s=4347:4408#L195)
+``` go
+func (client *Client) PreLoad(kid string, key *rsa.PublicKey)
+```
+PreLoad `kid` and `rsa.PublicKey` pair into client.
+
+
+
+
+### <a name="Client.Start">func</a> (\*Client) [Start](/src/target/client.go?s=2226:2261#L101)
 ``` go
 func (client *Client) Start() error
 ```
@@ -99,16 +109,16 @@ Start to fetch and cache JWKS.
 
 
 
-### <a name="Client.Stop">func</a> (\*Client) [Stop](/src/target/client.go?s=3234:3262#L149)
+### <a name="Client.Stop">func</a> (\*Client) [Stop](/src/target/client.go?s=3892:3920#L174)
 ``` go
 func (client *Client) Stop()
 ```
-Stop updating cache periodically.
+Stop to update cache periodically.
 
 
 
 
-## <a name="ClientConfig">type</a> [ClientConfig](/src/target/client.go?s=285:530#L24)
+## <a name="ClientConfig">type</a> [ClientConfig](/src/target/client.go?s=299:544#L25)
 ``` go
 type ClientConfig struct {
     DisableStrictTLS bool
@@ -216,7 +226,7 @@ Key returns keys by key ID.
 
 
 
-## <a name="Option">type</a> [Option](/src/target/client.go?s=857:891#L48)
+## <a name="Option">type</a> [Option](/src/target/client.go?s=918:952#L51)
 ``` go
 type Option = func(*ClientConfig) error
 ```
