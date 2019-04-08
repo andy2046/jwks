@@ -48,7 +48,7 @@ var (
 
 
 
-## <a name="Client">type</a> [Client](/src/target/client.go?s=603:871#L37)
+## <a name="Client">type</a> [Client](/src/target/client.go?s=671:939#L39)
 ``` go
 type Client struct {
     // contains filtered or unexported fields
@@ -62,7 +62,7 @@ Client fetch keys from a JSON Web Key set endpoint.
 
 
 
-### <a name="NewClient">func</a> [NewClient](/src/target/client.go?s=1179:1250#L63)
+### <a name="NewClient">func</a> [NewClient](/src/target/client.go?s=1247:1318#L65)
 ``` go
 func NewClient(jwksEndpoint string, options ...Option) (*Client, error)
 ```
@@ -72,7 +72,7 @@ NewClient returns a new JWKS client.
 
 
 
-### <a name="Client.ForceRefresh">func</a> (\*Client) [ForceRefresh](/src/target/client.go?s=3490:3526#L157)
+### <a name="Client.ForceRefresh">func</a> (\*Client) [ForceRefresh](/src/target/client.go?s=3558:3594#L159)
 ``` go
 func (client *Client) ForceRefresh()
 ```
@@ -82,7 +82,7 @@ the call is ignored if client is stopped or not started yet.
 
 
 
-### <a name="Client.KeySet">func</a> (\*Client) [KeySet](/src/target/client.go?s=4166:4211#L187)
+### <a name="Client.KeySet">func</a> (\*Client) [KeySet](/src/target/client.go?s=4234:4279#L189)
 ``` go
 func (client *Client) KeySet() *JSONWebKeySet
 ```
@@ -91,7 +91,7 @@ KeySet returns the cached JSONWebKeySet.
 
 
 
-### <a name="Client.PreLoad">func</a> (\*Client) [PreLoad](/src/target/client.go?s=4347:4408#L195)
+### <a name="Client.PreLoad">func</a> (\*Client) [PreLoad](/src/target/client.go?s=4415:4476#L197)
 ``` go
 func (client *Client) PreLoad(kid string, key *rsa.PublicKey)
 ```
@@ -100,7 +100,7 @@ PreLoad `kid` and `rsa.PublicKey` pair into client.
 
 
 
-### <a name="Client.Start">func</a> (\*Client) [Start](/src/target/client.go?s=2226:2261#L101)
+### <a name="Client.Start">func</a> (\*Client) [Start](/src/target/client.go?s=2294:2329#L103)
 ``` go
 func (client *Client) Start() error
 ```
@@ -109,7 +109,7 @@ Start to fetch and cache JWKS.
 
 
 
-### <a name="Client.Stop">func</a> (\*Client) [Stop](/src/target/client.go?s=3892:3920#L174)
+### <a name="Client.Stop">func</a> (\*Client) [Stop](/src/target/client.go?s=3960:3988#L176)
 ``` go
 func (client *Client) Stop()
 ```
@@ -118,7 +118,7 @@ Stop to update cache periodically.
 
 
 
-## <a name="ClientConfig">type</a> [ClientConfig](/src/target/client.go?s=299:544#L25)
+## <a name="ClientConfig">type</a> [ClientConfig](/src/target/client.go?s=330:612#L26)
 ``` go
 type ClientConfig struct {
     DisableStrictTLS bool
@@ -129,6 +129,7 @@ type ClientConfig struct {
 
     CacheTimeout   time.Duration
     RequestTimeout time.Duration
+    Headers        map[string]string
     // contains filtered or unexported fields
 }
 ```
@@ -226,7 +227,7 @@ Key returns keys by key ID.
 
 
 
-## <a name="Option">type</a> [Option](/src/target/client.go?s=918:952#L51)
+## <a name="Option">type</a> [Option](/src/target/client.go?s=986:1020#L53)
 ``` go
 type Option = func(*ClientConfig) error
 ```

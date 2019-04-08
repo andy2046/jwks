@@ -34,11 +34,16 @@ func (t *mockSuccessTransport) RoundTrip(req *http.Request) (*http.Response, err
 }
 
 func TestSuccessHttpRequest(t *testing.T) {
+	jwkClient, _ := NewClient("http://andy2046.io", func(config *ClientConfig) error {
+		config.EnableDebug = true
+		headers := make(map[string]string)
+		headers["Content-Type"] = "application/json"
+		config.Headers = headers
+		return nil
+	})
 	httpClient := http.DefaultClient
 	httpClient.Transport = &mockSuccessTransport{}
-	jwkClient, _ := NewClient("http://andy2046.io")
 	jwkClient.httpClient = httpClient
-	jwkClient.config.EnableDebug = true
 
 	err := jwkClient.Start()
 	assert(t, err == nil, fmt.Sprintf("fail to Start %s", err))

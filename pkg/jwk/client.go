@@ -18,6 +18,7 @@ import (
 const (
 	defaultRequestTimeout = 30 * time.Second
 	defaultCacheTimeout   = 600 * time.Second
+	methodGET             = "GET"
 )
 
 type (
@@ -31,6 +32,7 @@ type (
 		logger           *log.Logger
 		CacheTimeout     time.Duration
 		RequestTimeout   time.Duration
+		Headers          map[string]string
 	}
 
 	// Client fetch keys from a JSON Web Key set endpoint.
@@ -217,8 +219,18 @@ func (client *Client) fetchJWKS() (err error) {
 		client.config.logger.Printf("fetchJWKS from %s (period %s)\n", client.endpointURL, client.dog.period)
 	}
 
+	var req *http.Request
+	req, err = http.NewRequest(methodGET, client.endpointURL, nil)
+	if err != nil {
+		return
+	}
+	if len(client.config.Headers) != 0 {
+		for k, v := range client.config.Headers {
+			req.Header.Add(k, v)
+		}
+	}
 	var resp *http.Response
-	if resp, err = client.httpClient.Get(client.endpointURL); err != nil {
+	if resp, err = client.httpClient.Do(req); err != nil {
 		return
 	} else if resp.StatusCode >= 400 {
 		return fmt.Errorf("fetchJWKS request returned non-success StatusCode %d", resp.StatusCode)
